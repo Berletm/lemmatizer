@@ -3,6 +3,7 @@ import torch
 from torch.optim import RMSprop
 from torch.utils.data import DataLoader
 from typing import Tuple, List
+from tqdm import tqdm
 
 class WordEncoder(nn.Module):
     def __init__(self, vocab_size, emb_dim=64, hidden=128, out_dim=128):
@@ -60,7 +61,10 @@ def train(n_epoch: int, model: Lemmatizer, train_data: DataLoader, test_data: Da
         model.train()
         train_loss = 0.0
         total = 0
-        for x, y in train_data:
+
+        train_loader = tqdm(train_data, desc=f"Epoch {epoch+1}/{n_epoch} [train]", leave=True)
+
+        for x, y in train_loader:
             target, context = x
             pos, delete, suf = y
             
@@ -79,6 +83,8 @@ def train(n_epoch: int, model: Lemmatizer, train_data: DataLoader, test_data: Da
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            train_loader.set_postfix(loss=f"{train_loss/total:.4f}")
 
         train_loss /= total
         val_loss = 0.0

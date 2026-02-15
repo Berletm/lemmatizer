@@ -22,8 +22,8 @@ def main() -> None:
     train_dataset = LemmaDataset(tokenizer, train_reader.data)
     test_dataset  = LemmaDataset(tokenizer, test_reader.data)
     print(len(train_dataset), len(test_dataset))
-    train_loader  = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
-    test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4)
+    train_loader  = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
+    test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
     
     lemmatizer = Lemmatizer(tokenizer.vocab_size)
 
