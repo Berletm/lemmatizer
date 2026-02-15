@@ -8,20 +8,18 @@ from Utils.Utils import PADDING_TOKEN, UNKNOWN_TOKEN, MAX_WORD_LEN
 from .Tokenizer import Tokenizer
 
 class DataReader:
-    def __init__(self, path: str, suffix_vocab_size: int = 512, load: float = 1.0) -> None:
+    def __init__(self, path: str, load: float = 1.0) -> None:
         self.data: Dict[str, List[Tuple]] = {}
         self.raw_data: str = ""
         self.load = load
-        self.max_suffixes = suffix_vocab_size
-        self.suffixes = []
-        self.pos      = []
         self.suf_stats = Counter()
         self.pos_stats = Counter()
 
         self.files_path = [os.path.join(path, f) for f in os.listdir(path)]
 
-        with open(self.files_path[0], "r", encoding="utf-8") as f:
-            self.raw_data = f.read()
+        for p in self.files_path:
+            with open(p, "r", encoding="utf-8") as f:
+                self.raw_data += (f.read() + "\n\n")
 
     def parse(self) -> None:
         data_atoms = self.raw_data.strip().split("\n\n")
@@ -56,22 +54,15 @@ class DataReader:
 
             self.data[sentence] = tokens
 
-        self.suffixes = [s for s, _ in self.suf_stats.most_common(self.max_suffixes)]
-        self.pos = [p for p, _ in self.pos_stats.most_common()]
-
 class LemmaDataset(Dataset):
-    def __init__(self, reader: DataReader, context_window: int = 2) -> None:
+    def __init__(self, tokenizer: Tokenizer, data: Dict[str, List[Tuple]], context_window: int = 2) -> None:
         super().__init__()
 
-        self.data = reader.data
+        self.data = data
         self.X = []
         self.y = []
 
-        self.word_tokenizer = Tokenizer()
-        self.suf_mapper  = {suf: idx for idx, suf in enumerate(reader.suffixes)}
-        self.inverse_suf_mapper = {idx: suf for suf, idx in self.suf_mapper.items()} 
-        self.pos_mapper  = {pos: idx for idx, pos in enumerate(reader.pos)}
-        self.inverse_pos_mapper = {idx: suf for suf, idx in self.pos_mapper.items()}
+        self.tokenizer = tokenizer
 
         for _, val in self.data.items():
             for idx, (word, lemma, pos) in enumerate(val):
@@ -80,23 +71,23 @@ class LemmaDataset(Dataset):
                     i += 1
                 
                 to_delete = len(word) - i
-                to_add = self.suf_mapper.get(lemma[i:])
-                if to_add is None or to_delete >= 6: continue
-                pos = self.pos_mapper[pos]
-                self.y.append((pos, to_delete, to_add))
+                suf_idx = self.tokenizer.encode_suf(lemma[i:])
+                if suf_idx is None or to_delete >= 6: continue
+                pos_idx = tokenizer.encode_pos(pos)
+                self.y.append((pos_idx, to_delete, suf_idx))
                 
                 cur_context = []
                 for j in range(idx - context_window, idx + context_window + 1):
                     if j == idx: continue
                     if j < 0 or j >= len(val):
-                        cur_context.append(self.word_tokenizer.tokenize(PADDING_TOKEN))
+                        cur_context.append(self.tokenizer.tokenize(PADDING_TOKEN))
                     else:
-                        cur_context.append(self.word_tokenizer.tokenize(val[j][0]))
-                self.X.append((self.word_tokenizer.tokenize(word), cur_context))
+                        cur_context.append(self.tokenizer.tokenize(val[j][0]))
+                self.X.append((self.tokenizer.tokenize(word), cur_context))
 
     def __pad(self, vec: np.ndarray) -> np.ndarray:
         temp = [int(x) for x in vec]
-        pad_value = self.word_tokenizer.mapping[PADDING_TOKEN]
+        pad_value = self.tokenizer.str2tok[PADDING_TOKEN]
         pad_len = MAX_WORD_LEN - len(temp)
 
         if pad_len <= 0:
