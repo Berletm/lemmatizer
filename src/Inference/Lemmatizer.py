@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 from torch.optim import RMSprop
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from typing import Tuple, List
 from tqdm import tqdm
 
@@ -25,7 +26,7 @@ class WordEncoder(nn.Module):
 class Lemmatizer(nn.Module):
     def __init__(self, char_vocab_size: int, pos_classes: int = 16, max_delete:int = 6, suffix_vocab:int = 512):
         super().__init__()
-        self.word2vec = WordEncoder(char_vocab_size, emb_dim=64, hidden=128, out_dim=128)
+        self.word2vec = WordEncoder(char_vocab_size, emb_dim=128, hidden=128, out_dim=128)
 
         self.pos_head    = nn.Linear(in_features=128*5, out_features=pos_classes)
         self.delete_head = nn.Linear(in_features=128*5, out_features=max_delete)
@@ -48,16 +49,25 @@ def train(n_epoch: int, model: Lemmatizer, train_data: DataLoader, test_data: Da
 
     optimizer = RMSprop(
         model.parameters(),
-        lr=0.001,
+        lr=1e-3,
         alpha=0.99,
-        eps=1e-8,
+        eps=1e-6,
         weight_decay=1e-4,
-        momentum=0.0
+        momentum=1e-6
     )
     criterion = nn.CrossEntropyLoss()
+    scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=20, eta_min=1e-6)
     model = model.to(device)
 
+    patience   = 20
+    counter    = 0
+    best_loss  = float("inf") 
+    best_model = model
+
     for epoch in range(n_epoch):
+        if counter >= patience:
+            print(f"Early stopping {epoch + 1}/{n_epoch}")
+            return best_model
         model.train()
         train_loss = 0.0
         total = 0
@@ -83,6 +93,7 @@ def train(n_epoch: int, model: Lemmatizer, train_data: DataLoader, test_data: Da
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             train_loader.set_postfix(loss=f"{train_loss/total:.4f}")
 
@@ -108,6 +119,11 @@ def train(n_epoch: int, model: Lemmatizer, train_data: DataLoader, test_data: Da
                 total += len(target)
             val_loss /= total
 
+        if val_loss < best_loss:
+            best_loss = val_loss
+            best_model = model
+            counter = 0
+        else: counter += 1
         print(f"Epoch {epoch + 1}/{n_epoch} | Train loss {train_loss:.4f} | Val loss {val_loss:.4f}")
     return model
             
