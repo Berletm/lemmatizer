@@ -27,7 +27,7 @@ class WordEncoder(nn.Module):
 
 
 class Lemmatizer(nn.Module):
-    def __init__(self, char_vocab_size: int, pos_classes: int = 16, max_delete:int = 6, suffix_vocab:int = 512, context_window=2):
+    def __init__(self, char_vocab_size: int, pos_classes: int = 16, max_delete: int = 6, suffix_vocab: int = 512, context_window:int = 2):
         super().__init__()
         self.word2vec = WordEncoder(char_vocab_size, emb_dim=128, hidden=128, out_dim=128)
 
@@ -74,7 +74,7 @@ class Lemmatizer(nn.Module):
             suf = suf if suf else ""
 
             target_str = tokenizer.detokenize(target_str)
-            target_str_cut = target_str[:-delete]
+            target_str_cut = target_str[:-delete] if delete != 0 else target_str
             temp.append(f"{target_str}({target_str_cut + suf}={pos})")
         return " ".join(temp)
 

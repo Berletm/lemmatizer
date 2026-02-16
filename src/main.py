@@ -1,38 +1,31 @@
 from Data.DataReader import DataReader, LemmaDataset, Tokenizer
 from torch.utils.data import DataLoader
-from Utils.Utils import TRAIN_PATH, TEST_PATH, MODEL_SAVE_PATH, РУССКИЙ_АЛФАВИТ
+from Utils.Utils import TRAIN_PATH, TEST_PATH, MODEL_SAVE_PATH, РУССКИЙ_АЛФАВИТ, VOCABS_PATH
 from Inference.Lemmatizer import *
 import os
 
+def save_vocab(path:str, vocab: List[str]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        for word in vocab:
+            f.write(word + "\n")
+
+def load_vocab(path: str) -> List[str]:
+    vocab = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f.readlines():
+            vocab.append(line.strip("\n\t "))
+    return vocab
+
 def main() -> None:
-    train_reader = DataReader(TRAIN_PATH)
-    train_reader.parse()
-
-    test_reader = DataReader(TEST_PATH)
-    test_reader.parse()
-
-    suf_stats = train_reader.suf_stats + test_reader.suf_stats
-    pos_stats = train_reader.pos_stats + train_reader.pos_stats
-
-    suf_vocab = [s for s, _ in suf_stats.most_common(512)]
-    pos_vocab = [s for s, _ in pos_stats.most_common()]
+    suf_vocab = load_vocab(os.path.join(VOCABS_PATH, "suf_vocab.txt"))
+    pos_vocab = load_vocab(os.path.join(VOCABS_PATH, "pos_vocab.txt"))
 
     tokenizer = Tokenizer(РУССКИЙ_АЛФАВИТ, suf_vocab, pos_vocab)
-
-    train_dataset = LemmaDataset(tokenizer, train_reader.data)
-    test_dataset  = LemmaDataset(tokenizer, test_reader.data)
-    print(len(train_dataset), len(test_dataset))
-    train_loader  = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=2)
-    test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=2)
-    
-    lemmatizer = Lemmatizer(tokenizer.vocab_size)
-    # train(100, lemmatizer, train_loader, test_loader)
-    # torch.save(lemmatizer, os.path.join(MODEL_SAVE_PATH, "lemmatizer_v1.pth"))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lemmatizer = torch.load(os.path.join(MODEL_SAVE_PATH, "lemmatizer_v1.pth"), device, weights_only=False)
     lemmatizer.eval()
 
-    ans = lemmatizer.lemmatize("Все Гришины одноклассники уже побывали за границей, он был чуть ли не единственным, кого не вывозили никуда дальше Красной Пахры.", tokenizer)
+    ans = lemmatizer.lemmatize("Командующий Тихоокеанской эскадрой адмирал С. О. Макаров предложил ему служить на броненосце 'Петропавловск', с января по апрель 1904 года являвшемся флагманом эскадры.", tokenizer)
 
     print(ans)
 
