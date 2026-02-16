@@ -22,13 +22,19 @@ def main() -> None:
     train_dataset = LemmaDataset(tokenizer, train_reader.data)
     test_dataset  = LemmaDataset(tokenizer, test_reader.data)
     print(len(train_dataset), len(test_dataset))
-    train_loader  = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
-    test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=0)
+    train_loader  = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=2)
+    test_loader  = DataLoader(test_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=2)
     
     lemmatizer = Lemmatizer(tokenizer.vocab_size)
+    # train(100, lemmatizer, train_loader, test_loader)
+    # torch.save(lemmatizer, os.path.join(MODEL_SAVE_PATH, "lemmatizer_v1.pth"))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    lemmatizer = torch.load(os.path.join(MODEL_SAVE_PATH, "lemmatizer_v1.pth"), device, weights_only=False)
+    lemmatizer.eval()
 
-    train(100, lemmatizer, train_loader, test_loader)
-    torch.save(lemmatizer, os.path.join(MODEL_SAVE_PATH, "lemmatizer_v1.pth"))
-    
+    ans = lemmatizer.lemmatize("Все Гришины одноклассники уже побывали за границей, он был чуть ли не единственным, кого не вывозили никуда дальше Красной Пахры.", tokenizer)
+
+    print(ans)
+
 if __name__ == "__main__":
     main()

@@ -36,3 +36,6 @@ class Tokenizer:
 
     def detokenize(self, tokens: np.ndarray) -> str:
         return "".join([self.tok2str[tok] for tok in tokens])
+    
+    def __call__(self, word: str) -> np.ndarray:
+        return self.tokenize(word)
